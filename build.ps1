@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-py -3 -m PyInstaller `
+python -m PyInstaller `
   --noconsole `
   --onefile `
   --name TextPolish `
