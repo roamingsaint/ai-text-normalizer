@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "literal_replacements": [
+    { "find": "—", "replace": "-" },
+    { "find": "–", "replace": "-" },
+    { "find": "’", "replace": "'" },
+    { "find": "‘", "replace": "'" },
+    { "find": "“", "replace": "\"" },
+    { "find": "”", "replace": "\"" },
+    { "find": "…", "replace": "..." },
+    { "find": "\u00a0", "replace": " " },
+    { "find": "\u202f", "replace": " " }
+  ],
+  "regex_replacements": []
+}

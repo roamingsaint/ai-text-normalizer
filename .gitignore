@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+build/
+dist/
+release/
+*.spec
+*.log
+TextPolish.log
+TextNormalizer.log
+installer_dist/
+.venv/
+venv/

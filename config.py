@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+
+APP_NAME = "TextPolish"
+DEFAULT_NORMALIZE_HOTKEY = "ctrl+shift+q"
+DEFAULT_PREVIEW_HOTKEY = "ctrl+alt+shift+q"
+
+COPY_TIMEOUT_SECONDS = 0.75
+CLIPBOARD_POLL_INTERVAL_SECONDS = 0.02
+CLIPBOARD_SETTLE_DELAY_SECONDS = 0.04
+POST_PASTE_RESTORE_DELAY_SECONDS = 0.12
+
+PREVIEW_WINDOW_GEOMETRY = "980x560"
+PREVIEW_MIN_SIZE = (760, 420)
+
+
+def _is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def get_runtime_dir() -> Path:
+    if _is_frozen():
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def get_resource_dir() -> Path:
+    if _is_frozen():
+        return Path(getattr(sys, "_MEIPASS", get_runtime_dir()))
+    return get_runtime_dir()
+
+
+def get_rules_path() -> Path:
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / APP_NAME / "rules.json"
+    return Path.home() / f".{APP_NAME.lower()}" / "rules.json"
+
+
+def get_rules_dir() -> Path:
+    return get_rules_path().parent
+
+
+def get_log_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / APP_NAME / "logs"
+    return Path.home() / f".{APP_NAME.lower()}" / "logs"
+
+
+def get_log_file() -> Path:
+    return get_log_dir() / "textnormalizer.log"
+
+
+def get_settings_path() -> Path:
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / APP_NAME / "settings.json"
+    return Path.home() / f".{APP_NAME.lower()}" / "settings.json"
+
+
+def ensure_runtime_paths() -> None:
+    get_log_dir().mkdir(parents=True, exist_ok=True)
+    get_settings_path().parent.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_rules_file() -> Path:
+    runtime_rules = get_rules_path()
+    if runtime_rules.exists():
+        return runtime_rules
+
+    bundled_rules = get_resource_dir() / "rules.json"
+    if bundled_rules.exists():
+        runtime_rules.parent.mkdir(parents=True, exist_ok=True)
+        runtime_rules.write_text(bundled_rules.read_text(encoding="utf-8"), encoding="utf-8")
+    return runtime_rules
