@@ -5,8 +5,8 @@ dist/
 release/
 *.spec
 *.log
-TextPolish.log
-TextNormalizer.log
+AITextNormalizer.log
+ai-text-normalizer.log
 installer_dist/
 .venv/
 venv/

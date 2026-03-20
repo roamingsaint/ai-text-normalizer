@@ -1,4 +1,4 @@
-# TextPolish
+# AI Text Normalizer
 
 Build:
 
@@ -10,7 +10,7 @@ pip install -r requirements.txt
 Run:
 
 ```text
-release\TextPolish.exe
+release\AITextNormalizer.exe
 ```
 
 Use:

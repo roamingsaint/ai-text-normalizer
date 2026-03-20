@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-APP_NAME = "TextPolish"
+APP_NAME = "AI Text Normalizer"
 DEFAULT_NORMALIZE_HOTKEY = "ctrl+shift+q"
 DEFAULT_PREVIEW_HOTKEY = "ctrl+alt+shift+q"
 
@@ -53,7 +53,7 @@ def get_log_dir() -> Path:
 
 
 def get_log_file() -> Path:
-    return get_log_dir() / "textnormalizer.log"
+    return get_log_dir() / "ai-text-normalizer.log"
 
 
 def get_settings_path() -> Path:

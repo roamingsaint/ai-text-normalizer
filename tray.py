@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import queue
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -154,6 +155,7 @@ class TrayApp:
         self._thread: threading.Thread | None = None
         self._active_preview: PreviewDialog | None = None
         self._active_processing: ProcessingDialog | None = None
+        self._ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
 
     def start(self) -> None:
         image = self._create_icon_image()
@@ -219,7 +221,18 @@ class TrayApp:
         self._root.after(0, _close)
 
     def schedule_on_ui(self, callback: Callable[[], None]) -> None:
-        self._root.after(0, callback)
+        self._ui_queue.put(callback)
+
+    def process_pending_ui(self) -> None:
+        while True:
+            try:
+                callback = self._ui_queue.get_nowait()
+            except queue.Empty:
+                return
+            try:
+                callback()
+            except Exception:
+                LOGGER.exception("ui callback failed")
 
     def _handle_normalize_now(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_normalize_now()

@@ -96,7 +96,7 @@ class AppController:
 
     def request_normalize(self, *, preview: bool, source: str) -> None:
         if not self._busy_lock.acquire(blocking=False):
-            self._notify("TextNormalizer is already processing a selection.")
+            self._notify("AI Text Normalizer is already processing a selection.")
             return
         if self._tray is not None:
             self._tray.show_processing()
@@ -201,11 +201,17 @@ class AppController:
         return result["replace"]
 
     def open_rules(self) -> None:
-        try:
-            os.startfile(str(get_rules_path()))
-        except Exception:
-            logging.exception("failed to open rules file")
-            self._notify("Could not open rules.json.")
+        if self._tray is None:
+            return
+
+        def _open() -> None:
+            try:
+                os.startfile(str(get_rules_path()))
+            except Exception:
+                logging.exception("failed to open rules file")
+                self._notify("Could not open rules.json.")
+
+        self._tray.schedule_on_ui(_open)
 
     def shutdown(self) -> None:
         self._shutdown_event.set()
@@ -278,10 +284,15 @@ def main() -> None:
     hotkeys.start()
     tray.start()
 
+    def _pump_ui() -> None:
+        tray.process_pending_ui()
+        root.after(50, _pump_ui)
+
     def _on_close() -> None:
         controller.shutdown()
 
     root.protocol("WM_DELETE_WINDOW", _on_close)
+    root.after(50, _pump_ui)
     logging.info("%s started", APP_NAME)
     root.mainloop()
 
