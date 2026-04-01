@@ -72,7 +72,24 @@ class SettingsDialog:
         ttk.Button(buttons, text="Cancel", command=self.cancel).pack(side="right")
         ttk.Button(buttons, text="Save", command=self.save).pack(side="right", padx=(0, 8))
 
+        self._center()
+        self._window.deiconify()
+        self._window.lift()
+        self._window.focus_force()
+        self._window.grab_set()
         self._window.after(50, self._window.lift)
+
+    def _center(self) -> None:
+        self._window.update_idletasks()
+        width = self._window.winfo_reqwidth()
+        height = self._window.winfo_reqheight()
+        root_x = self._root.winfo_rootx()
+        root_y = self._root.winfo_rooty()
+        root_w = self._root.winfo_width() or 1
+        root_h = self._root.winfo_height() or 1
+        x = root_x + max((root_w - width) // 2, 0)
+        y = root_y + max((root_h - height) // 2, 0)
+        self._window.geometry(f"+{x}+{y}")
 
     def save(self) -> None:
         settings = AppSettings(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -80,7 +81,6 @@ class AppController:
             return
         if self._tray is None:
             return
-        self._settings_dialog_open = True
 
         def _on_save(new_settings: AppSettings) -> bool:
             return self.apply_settings(new_settings, persist=True, notify=True)
@@ -90,7 +90,14 @@ class AppController:
             self._active_settings_dialog = None
 
         def _open() -> None:
-            self._active_settings_dialog = SettingsDialog(self._root, self._settings, _on_save, _on_close)
+            try:
+                self._settings_dialog_open = True
+                self._active_settings_dialog = SettingsDialog(self._root, self._settings, _on_save, _on_close)
+            except Exception:
+                self._settings_dialog_open = False
+                self._active_settings_dialog = None
+                logging.exception("failed to open settings dialog")
+                self._notify("Could not open settings.")
 
         self._tray.schedule_on_ui(_open)
 
@@ -206,7 +213,15 @@ class AppController:
 
         def _open() -> None:
             try:
-                os.startfile(str(get_rules_path()))
+                rules_path = ensure_rules_file()
+                rules_path.parent.mkdir(parents=True, exist_ok=True)
+                if not rules_path.exists():
+                    self._notify("Rules file is missing and could not be created.")
+                    return
+                try:
+                    os.startfile(str(rules_path))
+                except Exception:
+                    subprocess.Popen(["notepad.exe", str(rules_path)])
             except Exception:
                 logging.exception("failed to open rules file")
                 self._notify("Could not open rules.json.")
