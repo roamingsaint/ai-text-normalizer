@@ -1,15 +1,15 @@
-{
+﻿{
   "version": 1,
   "literal_replacements": [
-    { "find": "—", "replace": "-" },
-    { "find": "–", "replace": "-" },
-    { "find": "’", "replace": "'" },
-    { "find": "‘", "replace": "'" },
-    { "find": "“", "replace": "\"" },
-    { "find": "”", "replace": "\"" },
-    { "find": "…", "replace": "..." },
+    { "find": "\u2019", "replace": "'" },
+    { "find": "\u2018", "replace": "'" },
+    { "find": "\u201c", "replace": "\"" },
+    { "find": "\u201d", "replace": "\"" },
+    { "find": "\u2026", "replace": "..." },
     { "find": "\u00a0", "replace": " " },
     { "find": "\u202f", "replace": " " }
   ],
-  "regex_replacements": []
+  "regex_replacements": [
+    { "pattern": "[ \\t]*[\u2013\u2014][ \\t]*", "replace": " - " }
+  ]
 }

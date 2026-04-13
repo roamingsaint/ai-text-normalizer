@@ -6,6 +6,9 @@ from pathlib import Path
 
 
 APP_NAME = "AI Text Normalizer"
+GITHUB_REPO = "roamingsaint/ai-text-normalizer"
+GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 DEFAULT_NORMALIZE_HOTKEY = "ctrl+shift+q"
 DEFAULT_PREVIEW_HOTKEY = "ctrl+alt+shift+q"
 
@@ -13,6 +16,7 @@ COPY_TIMEOUT_SECONDS = 0.75
 CLIPBOARD_POLL_INTERVAL_SECONDS = 0.02
 CLIPBOARD_SETTLE_DELAY_SECONDS = 0.04
 POST_PASTE_RESTORE_DELAY_SECONDS = 0.12
+INPUT_GUARD_TIMEOUT_SECONDS = 1.25
 
 PREVIEW_WINDOW_GEOMETRY = "980x560"
 PREVIEW_MIN_SIZE = (760, 420)
@@ -78,3 +82,4 @@ def ensure_rules_file() -> Path:
         runtime_rules.parent.mkdir(parents=True, exist_ok=True)
         runtime_rules.write_text(bundled_rules.read_text(encoding="utf-8"), encoding="utf-8")
     return runtime_rules
+

@@ -32,7 +32,25 @@ jobs:
         shell: pwsh
         run: .\build.ps1
 
-      - name: Upload release asset
+      - name: Generate checksum
+        shell: pwsh
+        run: |
+          $hash = Get-FileHash .\release\AITextNormalizer.exe -Algorithm SHA256
+          "$($hash.Hash) *AITextNormalizer.exe" | Set-Content -Path .\release\AITextNormalizer.exe.sha256
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AITextNormalizer-windows
+          path: |
+            release/AITextNormalizer.exe
+            release/AITextNormalizer.exe.sha256
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/AITextNormalizer.exe
+          files: |
+            release/AITextNormalizer.exe
+            release/AITextNormalizer.exe.sha256
+          generate_release_notes: true

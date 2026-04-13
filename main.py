@@ -5,12 +5,15 @@ import os
 import subprocess
 import threading
 import tkinter as tk
+import webbrowser
+from tkinter import messagebox
 from pathlib import Path
 
 from clipboard_utils import (
     ClipboardSnapshot,
     ClipboardError,
     capture_selected_text,
+    get_foreground_window,
     replace_selection_with_text,
     restore_text,
 )
@@ -22,6 +25,7 @@ from config import (
     DEFAULT_PREVIEW_HOTKEY,
     CLIPBOARD_POLL_INTERVAL_SECONDS,
     POST_PASTE_RESTORE_DELAY_SECONDS,
+    INPUT_GUARD_TIMEOUT_SECONDS,
     ensure_rules_file,
     ensure_runtime_paths,
     get_log_file,
@@ -33,6 +37,8 @@ from normalizer import NormalizationRules, load_rules, normalize_text
 from tray import TrayApp
 from settings_store import AppSettings, load_settings, save_settings
 from settings_ui import SettingsDialog
+from updater import UpdateCheckError, fetch_latest_release
+from version import APP_VERSION
 
 try:
     import winsound  # type: ignore
@@ -76,6 +82,10 @@ class AppController:
     def preview_now(self) -> None:
         self.request_normalize(preview=True, source="hotkey")
 
+    def check_for_updates(self) -> None:
+        thread = threading.Thread(target=self._check_for_updates_worker, daemon=True)
+        thread.start()
+
     def open_settings(self) -> None:
         if self._settings_dialog_open:
             return
@@ -101,6 +111,39 @@ class AppController:
 
         self._tray.schedule_on_ui(_open)
 
+    def _check_for_updates_worker(self) -> None:
+        try:
+            status = fetch_latest_release(APP_VERSION)
+        except UpdateCheckError as exc:
+            logging.exception("update check failed")
+            self._notify(f"Update check failed: {exc}")
+            return
+
+        if self._tray is None:
+            return
+
+        def _show_result() -> None:
+            if status.update_available:
+                should_open = messagebox.askyesno(
+                    f"{APP_NAME} Update",
+                    (
+                        f"Version {status.latest_version} is available.\n\n"
+                        f"You are running {status.current_version}.\n\n"
+                        "Open the download page now?"
+                    ),
+                    parent=self._root,
+                )
+                if should_open:
+                    webbrowser.open(status.download_url)
+            else:
+                messagebox.showinfo(
+                    f"{APP_NAME} Update",
+                    f"You are up to date on version {status.current_version}.",
+                    parent=self._root,
+                )
+
+        self._tray.schedule_on_ui(_show_result)
+
     def request_normalize(self, *, preview: bool, source: str) -> None:
         if not self._busy_lock.acquire(blocking=False):
             self._notify("AI Text Normalizer is already processing a selection.")
@@ -120,8 +163,12 @@ class AppController:
 
     def _normalize_worker(self, *, preview: bool, source: str) -> None:
         snapshot: ClipboardSnapshot | None = None
+        target_window = get_foreground_window()
+        guard_active = False
         try:
             logging.info("normalize requested from %s", source)
+            self._rules = load_rules(get_rules_path())
+            guard_active = self._activate_input_guard()
             captured = capture_selected_text(
                 copy_timeout=COPY_TIMEOUT_SECONDS,
                 poll_interval=CLIPBOARD_POLL_INTERVAL_SECONDS,
@@ -139,11 +186,24 @@ class AppController:
                 return
 
             if preview:
+                if guard_active:
+                    self._release_input_guard()
+                    guard_active = False
                 replace = self._prompt_preview(original_text, normalized_text)
                 if not replace:
                     restore_text(snapshot)
                     self._notify("Normalization cancelled.")
                     return
+                if target_window and get_foreground_window() != target_window:
+                    restore_text(snapshot)
+                    self._notify("Target window changed. Paste cancelled.")
+                    return
+                guard_active = self._activate_input_guard()
+
+            if target_window and get_foreground_window() != target_window:
+                restore_text(snapshot)
+                self._notify("Target window changed. Paste cancelled.")
+                return
 
             replace_selection_with_text(
                 normalized_text,
@@ -163,9 +223,21 @@ class AppController:
                 restore_text(snapshot)
             self._notify("Normalization failed. Check the log.")
         finally:
+            if guard_active:
+                self._release_input_guard()
             if self._tray is not None:
                 self._tray.hide_processing()
             self._busy_lock.release()
+
+    def _activate_input_guard(self) -> bool:
+        if self._tray is None:
+            return False
+        return self._tray.activate_input_guard(INPUT_GUARD_TIMEOUT_SECONDS)
+
+    def _release_input_guard(self) -> None:
+        if self._tray is None:
+            return
+        self._tray.release_input_guard()
 
     def apply_settings(self, new_settings: AppSettings, *, persist: bool, notify: bool) -> bool:
         if self._hotkeys is not None:
@@ -282,6 +354,7 @@ def main() -> None:
         on_normalize_now=controller.normalize_now,
         on_toggle_preview=controller.toggle_preview,
         on_open_settings=controller.open_settings,
+        on_check_updates=controller.check_for_updates,
         on_open_rules=controller.open_rules,
         on_exit=controller.shutdown,
         preview_state_getter=controller.preview_enabled,
@@ -314,3 +387,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

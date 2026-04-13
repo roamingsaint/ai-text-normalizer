@@ -74,6 +74,8 @@ user32.IsClipboardFormatAvailable.argtypes = (wintypes.UINT,)
 user32.IsClipboardFormatAvailable.restype = wintypes.BOOL
 user32.GetClipboardSequenceNumber.argtypes = ()
 user32.GetClipboardSequenceNumber.restype = wintypes.DWORD
+user32.GetForegroundWindow.argtypes = ()
+user32.GetForegroundWindow.restype = wintypes.HWND
 kernel32.GlobalAlloc.argtypes = (wintypes.UINT, ctypes.c_size_t)
 kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
 kernel32.GlobalLock.argtypes = (wintypes.HGLOBAL,)
@@ -115,6 +117,10 @@ def _open_clipboard(retries: int = 30, delay: float = 0.01) -> Iterator[None]:
 
 def get_sequence_number() -> int:
     return int(user32.GetClipboardSequenceNumber())
+
+
+def get_foreground_window() -> int:
+    return int(user32.GetForegroundWindow())
 
 
 def read_text() -> Optional[str]:

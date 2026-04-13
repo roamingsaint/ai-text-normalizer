@@ -103,6 +103,8 @@ class ProcessingDialog:
         self._window.attributes("-topmost", True)
         self._window.overrideredirect(True)
         self._window.protocol("WM_DELETE_WINDOW", lambda: None)
+        self._guard_active = False
+        self._guard_release_job: str | None = None
 
         container = ttk.Frame(self._window, padding=14)
         container.pack(fill="both", expand=True)
@@ -127,7 +129,37 @@ class ProcessingDialog:
         y = root_y + max((root_h - height) // 2, 0)
         self._window.geometry(f"+{x}+{y}")
 
+    def activate_input_guard(self, timeout_seconds: float) -> bool:
+        if not self._window.winfo_exists():
+            return False
+        self.release_input_guard()
+        try:
+            self._window.grab_set_global()
+            self._guard_active = True
+        except tk.TclError:
+            LOGGER.exception("processing input guard failed")
+            self._guard_active = False
+            return False
+        timeout_ms = max(int(timeout_seconds * 1000), 1)
+        self._guard_release_job = self._window.after(timeout_ms, self.release_input_guard)
+        return True
+
+    def release_input_guard(self) -> None:
+        if self._guard_release_job is not None and self._window.winfo_exists():
+            try:
+                self._window.after_cancel(self._guard_release_job)
+            except tk.TclError:
+                pass
+            self._guard_release_job = None
+        if self._guard_active and self._window.winfo_exists():
+            try:
+                self._window.grab_release()
+            except tk.TclError:
+                pass
+        self._guard_active = False
+
     def close(self) -> None:
+        self.release_input_guard()
         if self._window.winfo_exists():
             self._window.destroy()
 
@@ -140,6 +172,7 @@ class TrayApp:
         on_normalize_now: Callable[[], None],
         on_toggle_preview: Callable[[], None],
         on_open_settings: Callable[[], None],
+        on_check_updates: Callable[[], None],
         on_open_rules: Callable[[], None],
         on_exit: Callable[[], None],
         preview_state_getter: Callable[[], bool],
@@ -148,6 +181,7 @@ class TrayApp:
         self._on_normalize_now = on_normalize_now
         self._on_toggle_preview = on_toggle_preview
         self._on_open_settings = on_open_settings
+        self._on_check_updates = on_check_updates
         self._on_open_rules = on_open_rules
         self._on_exit = on_exit
         self._preview_state_getter = preview_state_getter
@@ -167,6 +201,7 @@ class TrayApp:
                 checked=lambda item: self._preview_state_getter(),
             ),
             pystray.MenuItem("Settings...", self._handle_open_settings),
+            pystray.MenuItem("Check for updates", self._handle_check_updates),
             pystray.MenuItem("Open rules.json", self._handle_open_rules),
             pystray.MenuItem("Exit", self._handle_exit),
         )
@@ -210,7 +245,7 @@ class TrayApp:
             if self._active_processing is None:
                 self._active_processing = ProcessingDialog(self._root, message)
 
-        self._root.after(0, _open)
+        self._schedule_on_ui_wait(_open)
 
     def hide_processing(self) -> None:
         def _close() -> None:
@@ -218,10 +253,39 @@ class TrayApp:
                 self._active_processing.close()
                 self._active_processing = None
 
-        self._root.after(0, _close)
+        self._schedule_on_ui_wait(_close)
 
     def schedule_on_ui(self, callback: Callable[[], None]) -> None:
         self._ui_queue.put(callback)
+
+    def _schedule_on_ui_wait(self, callback: Callable[[], object], timeout_seconds: float = 1.0) -> object:
+        done = threading.Event()
+        result: dict[str, object] = {"value": None}
+
+        def _wrapped() -> None:
+            try:
+                result["value"] = callback()
+            finally:
+                done.set()
+
+        self.schedule_on_ui(_wrapped)
+        done.wait(timeout_seconds)
+        return result["value"]
+
+    def activate_input_guard(self, timeout_seconds: float) -> bool:
+        def _activate() -> bool:
+            if self._active_processing is None:
+                return False
+            return self._active_processing.activate_input_guard(timeout_seconds)
+
+        return bool(self._schedule_on_ui_wait(_activate))
+
+    def release_input_guard(self) -> None:
+        def _release() -> None:
+            if self._active_processing is not None:
+                self._active_processing.release_input_guard()
+
+        self._schedule_on_ui_wait(_release)
 
     def process_pending_ui(self) -> None:
         while True:
@@ -249,6 +313,9 @@ class TrayApp:
 
     def _handle_open_settings(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_open_settings()
+
+    def _handle_check_updates(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        self._on_check_updates()
 
     def _handle_exit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_exit()
