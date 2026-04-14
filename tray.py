@@ -16,6 +16,17 @@ from config import APP_NAME, PREVIEW_MIN_SIZE, PREVIEW_WINDOW_GEOMETRY
 LOGGER = logging.getLogger(__name__)
 
 
+def _center_window_on_screen(window: tk.Toplevel, *, width: int | None = None, height: int | None = None, vertical_fraction: float = 0.33) -> None:
+    window.update_idletasks()
+    target_width = width or window.winfo_reqwidth()
+    target_height = height or window.winfo_reqheight()
+    screen_w = window.winfo_screenwidth()
+    screen_h = window.winfo_screenheight()
+    x = max((screen_w - target_width) // 2, 0)
+    y = max(int((screen_h - target_height) * vertical_fraction), 0)
+    window.geometry(f"{target_width}x{target_height}+{x}+{y}")
+
+
 class PreviewDialog:
     def __init__(
         self,
@@ -31,10 +42,9 @@ class PreviewDialog:
         self._on_cancel = on_cancel
         self._on_close = on_close
         self._window = tk.Toplevel(root)
+        self._window.withdraw()
         self._window.title(f"{APP_NAME} Preview")
-        self._window.geometry(PREVIEW_WINDOW_GEOMETRY)
         self._window.minsize(*PREVIEW_MIN_SIZE)
-        self._window.transient(root)
         self._window.attributes("-topmost", True)
         self._window.protocol("WM_DELETE_WINDOW", self.cancel)
 
@@ -55,8 +65,8 @@ class PreviewDialog:
         panes.add(left_frame, weight=1)
         panes.add(right_frame, weight=1)
 
-        self._original = self._build_readonly_text(left_frame, original_text)
-        self._normalized = self._build_readonly_text(right_frame, normalized_text)
+        self._build_readonly_text(left_frame, original_text)
+        self._build_readonly_text(right_frame, normalized_text)
 
         button_row = ttk.Frame(container)
         button_row.pack(fill="x", pady=(12, 0))
@@ -66,7 +76,9 @@ class PreviewDialog:
         cancel_button.pack(side="right")
         replace_button.pack(side="right", padx=(0, 8))
 
-        self._window.after(50, self._window.lift)
+        width, height = (int(part) for part in PREVIEW_WINDOW_GEOMETRY.split('x', 1))
+        _center_window_on_screen(self._window, width=width, height=height, vertical_fraction=0.2)
+        self.focus()
 
     @staticmethod
     def _build_readonly_text(parent: ttk.Frame, text: str) -> tk.Text:
@@ -78,6 +90,14 @@ class PreviewDialog:
         text_widget.insert("1.0", text)
         text_widget.configure(state="disabled")
         return text_widget
+
+    def focus(self) -> None:
+        if not self._window.winfo_exists():
+            return
+        self._window.deiconify()
+        self._window.lift()
+        self._window.focus_force()
+        self._window.after(50, self._window.lift)
 
     def replace(self) -> None:
         self._close()
@@ -97,9 +117,9 @@ class ProcessingDialog:
     def __init__(self, root: tk.Tk, message: str = "Processing selection...") -> None:
         self._root = root
         self._window = tk.Toplevel(root)
+        self._window.withdraw()
         self._window.title(APP_NAME)
         self._window.resizable(False, False)
-        self._window.transient(root)
         self._window.attributes("-topmost", True)
         self._window.overrideredirect(True)
         self._window.protocol("WM_DELETE_WINDOW", lambda: None)
@@ -114,20 +134,9 @@ class ProcessingDialog:
         bar.pack(fill="x", pady=(10, 0))
         bar.start(12)
 
-        self._center()
-        self._window.after(50, self._window.lift)
-
-    def _center(self) -> None:
-        self._window.update_idletasks()
-        width = self._window.winfo_reqwidth()
-        height = self._window.winfo_reqheight()
-        root_x = self._root.winfo_rootx()
-        root_y = self._root.winfo_rooty()
-        root_w = self._root.winfo_width() or 1
-        root_h = self._root.winfo_height() or 1
-        x = root_x + max((root_w - width) // 2, 0)
-        y = root_y + max((root_h - height) // 2, 0)
-        self._window.geometry(f"+{x}+{y}")
+        _center_window_on_screen(self._window)
+        self._window.deiconify()
+        self._window.lift()
 
     def activate_input_guard(self, timeout_seconds: float) -> bool:
         if not self._window.winfo_exists():
@@ -172,8 +181,6 @@ class TrayApp:
         on_normalize_now: Callable[[], None],
         on_toggle_preview: Callable[[], None],
         on_open_settings: Callable[[], None],
-        on_check_updates: Callable[[], None],
-        on_open_rules: Callable[[], None],
         on_exit: Callable[[], None],
         preview_state_getter: Callable[[], bool],
     ) -> None:
@@ -181,8 +188,6 @@ class TrayApp:
         self._on_normalize_now = on_normalize_now
         self._on_toggle_preview = on_toggle_preview
         self._on_open_settings = on_open_settings
-        self._on_check_updates = on_check_updates
-        self._on_open_rules = on_open_rules
         self._on_exit = on_exit
         self._preview_state_getter = preview_state_getter
         self._icon: pystray.Icon | None = None
@@ -201,8 +206,6 @@ class TrayApp:
                 checked=lambda item: self._preview_state_getter(),
             ),
             pystray.MenuItem("Settings...", self._handle_open_settings),
-            pystray.MenuItem("Check for updates", self._handle_check_updates),
-            pystray.MenuItem("Open rules.json", self._handle_open_rules),
             pystray.MenuItem("Exit", self._handle_exit),
         )
         self._icon = pystray.Icon(APP_NAME, image, APP_NAME, menu)
@@ -228,6 +231,10 @@ class TrayApp:
         on_replace: Callable[[], None],
         on_cancel: Callable[[], None],
     ) -> None:
+        if self._active_preview is not None:
+            self._active_preview.focus()
+            return
+
         def _clear_preview() -> None:
             self._active_preview = None
 
@@ -308,14 +315,8 @@ class TrayApp:
         except Exception:
             LOGGER.exception("failed to update tray menu")
 
-    def _handle_open_rules(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        self._on_open_rules()
-
     def _handle_open_settings(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_open_settings()
-
-    def _handle_check_updates(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        self._on_check_updates()
 
     def _handle_exit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_exit()

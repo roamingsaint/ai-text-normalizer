@@ -1,8 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
+import tempfile
 import threading
 import tkinter as tk
 import webbrowser
@@ -29,13 +31,14 @@ from config import (
     ensure_rules_file,
     ensure_runtime_paths,
     get_log_file,
+    get_resource_dir,
     get_rules_path,
     get_settings_path,
 )
 from hotkeys import HotkeyService
 from normalizer import NormalizationRules, load_rules, normalize_text
 from tray import TrayApp
-from settings_store import AppSettings, load_settings, save_settings
+from settings_store import AppSettings, load_settings, normalize_base_hotkey, save_settings, to_preview_hotkey
 from settings_ui import SettingsDialog
 from updater import UpdateCheckError, fetch_latest_release
 from version import APP_VERSION
@@ -88,6 +91,8 @@ class AppController:
 
     def open_settings(self) -> None:
         if self._settings_dialog_open:
+            if self._active_settings_dialog is not None and self._tray is not None:
+                self._tray.schedule_on_ui(self._active_settings_dialog.focus)
             return
         if self._tray is None:
             return
@@ -102,7 +107,17 @@ class AppController:
         def _open() -> None:
             try:
                 self._settings_dialog_open = True
-                self._active_settings_dialog = SettingsDialog(self._root, self._settings, _on_save, _on_close)
+                self._active_settings_dialog = SettingsDialog(
+                    self._root,
+                    self._settings,
+                    APP_VERSION,
+                    _on_save,
+                    self.check_for_updates,
+                    self.open_rules,
+                    self.open_default_rules,
+                    self.reset_rules_to_default,
+                    _on_close,
+                )
             except Exception:
                 self._settings_dialog_open = False
                 self._active_settings_dialog = None
@@ -210,7 +225,6 @@ class AppController:
                 snapshot,
                 restore_delay=POST_PASTE_RESTORE_DELAY_SECONDS,
             )
-            self._notify("Selection normalized.")
             self._play_success_sound()
         except ClipboardError as exc:
             logging.exception("clipboard path failed")
@@ -243,8 +257,8 @@ class AppController:
         if self._hotkeys is not None:
             try:
                 self._hotkeys.restart(
-                    normalize_hotkey=new_settings.normalize_hotkey,
-                    preview_hotkey=new_settings.preview_hotkey,
+                    normalize_hotkey=normalize_base_hotkey(new_settings.normalize_hotkey),
+                    preview_hotkey=to_preview_hotkey(new_settings.normalize_hotkey),
                 )
             except Exception:
                 logging.exception("failed to reconfigure hotkeys")
@@ -278,6 +292,41 @@ class AppController:
 
         decision.wait()
         return result["replace"]
+
+    def open_default_rules(self) -> None:
+        bundled_path = get_resource_dir() / "rules.json"
+        if not bundled_path.exists():
+            self._notify("Bundled default rules are missing.")
+            return
+
+        def _open() -> None:
+            try:
+                view_path = Path(tempfile.gettempdir()) / "ai-text-normalizer-default-rules.json"
+                shutil.copyfile(bundled_path, view_path)
+                try:
+                    os.startfile(str(view_path))
+                except Exception:
+                    subprocess.Popen(["notepad.exe", str(view_path)])
+            except Exception:
+                logging.exception("failed to open bundled default rules")
+                self._notify("Could not open bundled default rules.")
+
+        if self._tray is not None:
+            self._tray.schedule_on_ui(_open)
+
+    def reset_rules_to_default(self) -> None:
+        try:
+            bundled_path = get_resource_dir() / "rules.json"
+            runtime_path = ensure_rules_file()
+            if not bundled_path.exists():
+                self._notify("Bundled default rules are missing.")
+                return
+            runtime_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(bundled_path, runtime_path)
+            self._notify("Live rules reset to bundled defaults.")
+        except Exception:
+            logging.exception("failed to reset rules file")
+            self._notify("Could not reset rules to defaults.")
 
     def open_rules(self) -> None:
         if self._tray is None:
@@ -354,16 +403,14 @@ def main() -> None:
         on_normalize_now=controller.normalize_now,
         on_toggle_preview=controller.toggle_preview,
         on_open_settings=controller.open_settings,
-        on_check_updates=controller.check_for_updates,
-        on_open_rules=controller.open_rules,
         on_exit=controller.shutdown,
         preview_state_getter=controller.preview_enabled,
     )
     controller.set_tray(tray)
 
     hotkeys = HotkeyService(
-        normalize_hotkey=settings.normalize_hotkey,
-        preview_hotkey=settings.preview_hotkey,
+        normalize_hotkey=normalize_base_hotkey(settings.normalize_hotkey),
+        preview_hotkey=to_preview_hotkey(settings.normalize_hotkey),
         on_normalize=controller.normalize_now,
         on_preview=controller.preview_now,
     )
@@ -387,4 +434,10 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
 

@@ -24,7 +24,7 @@ class KeyboardHotkeyBackend:
         self._registrations: list[RegisteredHotkey] = []
 
     def register(self, hotkey: str, callback: Callable[[], None]) -> None:
-        handle = self._keyboard.add_hotkey(hotkey, callback, suppress=False, trigger_on_release=False)
+        handle = self._keyboard.add_hotkey(hotkey, callback, suppress=True, trigger_on_release=False)
         self._registrations.append(RegisteredHotkey(hotkey=hotkey, handle=handle))
         LOGGER.info("registered hotkey: %s", hotkey)
 

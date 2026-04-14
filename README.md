@@ -1,53 +1,111 @@
-# AI Text Normalizer
+﻿# AI Text Normalizer
 
-## Run It
+Tired of em-dashes and weird quotes in AI output?
+Run AI Text Normalizer to turn that into clean, normal human text.
 
-Build the Windows EXE:
+## Platform support
+
+Current support:
+- Windows only
+
+Not supported yet:
+- Linux
+- macOS
+- iOS
+- Android
+
+The current app is a Windows tray utility with Windows-specific global hotkey, clipboard, and text replacement behavior.
+
+This can still evolve in the same repo later by keeping the normalization engine and rules shared, while adding separate platform-specific app layers for Windows, Linux, and any future mobile implementation.
+
+## What it fixes by default
+
+- `—` and `–` to standard dash formatting
+- Curly quotes to straight quotes (`“ ”` -> `"`, `‘ ’` -> `'`)
+- Ellipsis (`…`) to `...`
+- Non-breaking spaces to regular spaces
+
+You can extend or change these rules in Settings via `Open live rules.json`.
+
+## Install (Windows users)
+
+1. Open the GitHub Releases page for the project.
+2. Download one of:
+   - `AITextNormalizer.exe`
+   - `AITextNormalizer-portable.zip`
+3. Run `AITextNormalizer.exe`.
+
+No Python installation is required for end users.
+
+## Build from source
 
 ```powershell
 python -m pip install -r requirements.txt
 .\build.ps1
 ```
 
-Run the app:
+## Run local build
 
 ```text
 release\AITextNormalizer.exe
 ```
 
-## Use It
+## Current behavior
 
-- `Ctrl+Shift+Q` normalizes the current selection
-- `Ctrl+Alt+Shift+Q` opens preview first
-- The app stays in the tray while running
-- Right-click the tray icon for `Settings...`, `Check for updates`, and `Open rules.json`
+- Tray menu: `Normalize selected text now`, `Toggle preview before replace`, `Settings...`, `Exit`
+- `Normalize hotkey` is editable in Settings
+- `Preview hotkey` is auto-derived as `Alt + Normalize` and is non-editable
+- Any `alt` entered in Normalize is ignored
+- Rules and updates are managed from Settings
 
-Edit `rules.json` to change replacements. See `RULES.md` for rule format and ordering.
+## Hotkey rules
 
-## Share It
+In Settings:
+- Only Normalize is editable
+- Preview is generated automatically
+- Normalize must include at least 3 keys
+- Normalize must include one non-modifier key (for example: `q`, `n`, `f8`)
+- Example: `ctrl+shift+q` => preview `ctrl+alt+shift+q`
 
-For Windows users, distribute the GitHub release asset:
+## Rules and updates
 
+In Settings:
+- `Open live rules.json`
+- `View bundled defaults`
+- `Reset live rules to defaults`
+- `Check for updates (vX.Y.Z)`
+
+Rules format and ordering are documented in [RULES.md](/C:/DEV/TextNormalizer/RULES.md).
+
+## Update check behavior
+
+When local version is outdated and you click `Check for updates`:
+- The app checks the latest GitHub release via API.
+- It opens the latest release EXE asset download URL when available.
+- If no EXE asset URL is found, it opens the release page.
+
+## Share (Windows)
+
+Distribute from GitHub Releases:
 - `AITextNormalizer.exe`
 - `AITextNormalizer.exe.sha256`
+- `AITextNormalizer-portable.zip`
 
-Users do not need Python installed. They download the EXE from GitHub Releases and run it directly.
+## Known limitations
 
-## Publish Updates
+- Some apps block synthetic copy/paste and will not normalize reliably.
+- Secure or protected input fields are unsupported.
+- Shortcut conflicts can still happen with aggressive app-level hotkey handlers.
 
-1. Update `version.py`
-2. Commit and push the change
-3. Create and push a tag like `v0.3.0`
+## Publish updates
+
+1. Update [version.py](/C:/DEV/TextNormalizer/version.py)
+2. Commit and push
+3. Tag and push, for example:
 
 ```powershell
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
-GitHub Actions will build the EXE, generate a SHA-256 checksum, and attach both files to the GitHub Release.
-
-## Update Checks
-
-The tray menu has `Check for updates`.
-
-It checks the latest GitHub Release for `roamingsaint/ai-text-normalizer`, compares it to the app's current version, and opens the release download page if a newer version is available.
+GitHub Actions will build and publish EXE, checksum, and portable ZIP assets.
