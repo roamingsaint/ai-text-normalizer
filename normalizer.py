@@ -11,18 +11,7 @@ from typing import Any
 
 
 LOGGER = logging.getLogger(__name__)
-RULES_VERSION_KEY = "rules_version"
-BASED_ON_RULES_VERSION_KEY = "based_on_rules_version"
-BASE_RULES_DIGEST_KEY = "base_rules_digest"
-RULES_METADATA_KEYS = {
-    "version",
-    RULES_VERSION_KEY,
-    BASED_ON_RULES_VERSION_KEY,
-    BASE_RULES_DIGEST_KEY,
-}
-LEGACY_DEFAULT_RULESET_VERSIONS = {
-    "47043033ec2c3d62e1b22b80f999d9c5f4f7b9950e24eb8d50fb8fe730994783": "1.0.0",
-}
+RULES_METADATA_KEYS = {"version"}
 
 
 @dataclass(frozen=True)
@@ -45,10 +34,6 @@ class RegexReplacement:
 class NormalizationRules:
     literal_replacements: list[LiteralReplacement] = field(default_factory=list)
     regex_replacements: list[RegexReplacement] = field(default_factory=list)
-    rules_version: str = ""
-    based_on_rules_version: str = ""
-    base_rules_digest: str = ""
-    current_rules_digest: str = ""
 
     def normalize(self, text: str) -> str:
         result = text
@@ -58,9 +43,6 @@ class NormalizationRules:
         for rule in self.regex_replacements:
             result = rule.compiled().sub(rule.replace, result)
         return result
-
-    def is_customized(self) -> bool:
-        return bool(self.base_rules_digest) and self.current_rules_digest != self.base_rules_digest
 
 
 def _rules_payload_without_metadata(payload: dict[str, Any]) -> dict[str, Any]:
@@ -85,20 +67,13 @@ def compute_rules_digest_from_payload(payload: dict[str, Any]) -> str:
 def serialize_rules_payload_to_toml(payload: dict[str, Any]) -> str:
     lines: list[str] = [
         '# AI Text Normalizer rules',
-        '# Comments are allowed in TOML. For detailed guidance and examples, see RULES.md.',
+        '# Edit these rules to customize how selected text is normalized.',
+        '# literal_replacements are exact character-for-character substitutions.',
+        '# regex_replacements are pattern-based replacements for things like dash spacing.',
         "",
     ]
     version = payload.get("version", 1)
     lines.append(f"version = {int(version) if isinstance(version, int) else 1}")
-    rules_version = str(payload.get(RULES_VERSION_KEY) or "")
-    if rules_version:
-        lines.append(f'{RULES_VERSION_KEY} = {json.dumps(rules_version, ensure_ascii=False)}')
-    based_on_rules_version = str(payload.get(BASED_ON_RULES_VERSION_KEY) or "")
-    if based_on_rules_version:
-        lines.append(f'{BASED_ON_RULES_VERSION_KEY} = {json.dumps(based_on_rules_version, ensure_ascii=False)}')
-    base_rules_digest = str(payload.get(BASE_RULES_DIGEST_KEY) or "")
-    if base_rules_digest:
-        lines.append(f'{BASE_RULES_DIGEST_KEY} = {json.dumps(base_rules_digest, ensure_ascii=False)}')
 
     literal_rules = payload.get("literal_replacements", [])
     if isinstance(literal_rules, list):
@@ -154,16 +129,6 @@ def load_rules_payload(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("rules file must contain a JSON object")
     return payload
-
-
-def stamp_live_rules_payload(payload: dict[str, Any], *, based_on_rules_version: str | None = None) -> dict[str, Any]:
-    stamped = dict(payload)
-    rules_version = str(stamped.get(RULES_VERSION_KEY) or "")
-    if not based_on_rules_version:
-        based_on_rules_version = rules_version
-    stamped[BASED_ON_RULES_VERSION_KEY] = based_on_rules_version
-    stamped[BASE_RULES_DIGEST_KEY] = compute_rules_digest_from_payload(stamped)
-    return stamped
 
 
 def write_rules_payload(path: Path, payload: dict[str, Any]) -> None:
@@ -233,15 +198,7 @@ def _parse_rules_payload(payload: dict[str, Any]) -> NormalizationRules:
     return NormalizationRules(
         literal_replacements=literal_rules,
         regex_replacements=regex_rules,
-        rules_version=str(payload.get(RULES_VERSION_KEY) or ""),
-        based_on_rules_version=str(payload.get(BASED_ON_RULES_VERSION_KEY) or ""),
-        base_rules_digest=str(payload.get(BASE_RULES_DIGEST_KEY) or ""),
-        current_rules_digest=compute_rules_digest_from_payload(payload),
     )
-
-
-def infer_legacy_rules_version(rules: NormalizationRules) -> str:
-    return LEGACY_DEFAULT_RULESET_VERSIONS.get(rules.current_rules_digest, "")
 
 
 def load_rules(path: Path) -> NormalizationRules:

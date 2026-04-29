@@ -1,13 +1,11 @@
 ﻿from __future__ import annotations
 
 import tkinter as tk
-from dataclasses import dataclass
 from tkinter import messagebox, ttk
 from typing import Callable
 
 from config import APP_NAME
 from settings_store import AppSettings, normalize_base_hotkey, to_preview_hotkey
-from updater import UpdateStatus
 
 SHIFT_MASK = 0x0001
 CONTROL_MASK = 0x0004
@@ -115,14 +113,6 @@ def _has_minimum_combo(value: str, minimum_parts: int = 3) -> bool:
     return len(parts) >= minimum_parts
 
 
-@dataclass(frozen=True)
-class RulesVersionStatus:
-    headline: str
-    detail: str = ""
-    can_update: bool = False
-    is_customized: bool = False
-
-
 class SettingsDialog:
     def __init__(
         self,
@@ -133,10 +123,7 @@ class SettingsDialog:
         on_check_updates: Callable[[], None],
         on_open_rules: Callable[[], None],
         on_open_default_rules: Callable[[], None],
-        on_open_rules_guide: Callable[[], None],
-        on_open_readme: Callable[[], None],
         on_reset_rules: Callable[[], None],
-        on_open_update_download: Callable[[str], None],
         on_close: Callable[[], None],
     ) -> None:
         self._root = root
@@ -144,12 +131,8 @@ class SettingsDialog:
         self._on_check_updates = on_check_updates
         self._on_open_rules = on_open_rules
         self._on_open_default_rules = on_open_default_rules
-        self._on_open_rules_guide = on_open_rules_guide
-        self._on_open_readme = on_open_readme
         self._on_reset_rules = on_reset_rules
-        self._on_open_update_download = on_open_update_download
         self._on_close = on_close
-        self._update_download_url: str | None = None
 
         normalize_base = normalize_base_hotkey(settings.normalize_hotkey)
 
@@ -223,61 +206,9 @@ class SettingsDialog:
         ttk.Button(rules_frame, text="View bundled defaults", command=self._on_open_default_rules).pack(side="left", padx=(8, 0))
         ttk.Button(rules_frame, text="Reset live rules to defaults", command=self._confirm_reset_rules).pack(side="left", padx=(8, 0))
 
-        docs_frame = ttk.Labelframe(container, text="Docs", padding=10)
-        docs_frame.pack(fill="x", pady=(14, 0))
-        ttk.Button(docs_frame, text="Open README.md", command=self._on_open_readme).pack(side="left")
-        ttk.Button(docs_frame, text="Open RULES.md", command=self._on_open_rules_guide).pack(side="left", padx=(8, 0))
-
         updates_frame = ttk.Labelframe(container, text="Updates", padding=10)
         updates_frame.pack(fill="x", pady=(14, 0))
-        ttk.Label(updates_frame, text="App").pack(anchor="w")
-        self._check_updates_button = ttk.Button(
-            updates_frame,
-            text=f"Check for updates (v{current_version})",
-            command=self._start_update_check,
-        )
-        self._check_updates_button.pack(anchor="w", pady=(4, 0))
-        self._update_status_var = tk.StringVar(value="")
-        self._update_status_label = ttk.Label(
-            updates_frame,
-            textvariable=self._update_status_var,
-            justify="left",
-            wraplength=420,
-        )
-        self._update_status_label.pack(anchor="w", pady=(8, 0))
-        self._open_download_button = ttk.Button(
-            updates_frame,
-            text="Open download page",
-            command=self._open_download_page,
-            state="disabled",
-        )
-        self._open_download_button.pack(anchor="w", pady=(8, 0))
-        ttk.Separator(updates_frame, orient="horizontal").pack(fill="x", pady=(12, 10))
-        ttk.Label(updates_frame, text="Default rules.toml").pack(anchor="w")
-        self._rules_status_var = tk.StringVar(value="")
-        self._rules_status_label = ttk.Label(
-            updates_frame,
-            textvariable=self._rules_status_var,
-            justify="left",
-            wraplength=420,
-        )
-        self._rules_status_label.pack(anchor="w", pady=(4, 0))
-        self._rules_detail_var = tk.StringVar(value="")
-        self._rules_detail_label = ttk.Label(
-            updates_frame,
-            textvariable=self._rules_detail_var,
-            justify="left",
-            foreground="#5a5a5a",
-            wraplength=420,
-        )
-        self._rules_detail_label.pack(anchor="w", pady=(6, 0))
-        self._rules_action_button = ttk.Button(
-            updates_frame,
-            text="Review rules",
-            command=self._on_open_rules,
-            state="disabled",
-        )
-        self._rules_action_button.pack(anchor="w", pady=(8, 0))
+        ttk.Button(updates_frame, text=f"Check for updates (v{current_version})", command=self._on_check_updates).pack(anchor="w")
 
         buttons = ttk.Frame(container)
         buttons.pack(fill="x", pady=(14, 0))
@@ -287,63 +218,6 @@ class SettingsDialog:
         self._center_on_screen()
         self.focus()
         self._window.grab_set()
-
-    def _start_update_check(self) -> None:
-        self.set_update_checking()
-        self._on_check_updates()
-
-    def _open_download_page(self) -> None:
-        if self._update_download_url:
-            self._on_open_update_download(self._update_download_url)
-
-    def set_update_checking(self) -> None:
-        self._update_download_url = None
-        self._check_updates_button.configure(state="disabled")
-        self._open_download_button.configure(state="disabled")
-        self._update_status_var.set("Checking for updates...")
-
-    def set_update_available(self, status: UpdateStatus) -> None:
-        self._update_download_url = status.download_url
-        self._check_updates_button.configure(state="normal")
-        self._open_download_button.configure(state="normal")
-        self._update_status_var.set(
-            f"Version {status.latest_version} is available. You are running {status.current_version}."
-        )
-
-    def set_up_to_date(self, current_version: str) -> None:
-        self._update_download_url = None
-        self._check_updates_button.configure(state="normal")
-        self._open_download_button.configure(state="disabled")
-        self._update_status_var.set(f"You are up to date on version {current_version}.")
-
-    def set_update_error(self, message: str) -> None:
-        self._update_download_url = None
-        self._check_updates_button.configure(state="normal")
-        self._open_download_button.configure(state="disabled")
-        self._update_status_var.set(message)
-
-    def set_rules_status(self, status: RulesVersionStatus) -> None:
-        self._rules_status_var.set(status.headline)
-        self._rules_detail_var.set(status.detail)
-        if status.can_update:
-            self._rules_action_button.configure(
-                text="Update live rules to new defaults",
-                command=self._confirm_reset_rules,
-                state="normal",
-            )
-            return
-        if status.is_customized:
-            self._rules_action_button.configure(
-                text="Review my live rules",
-                command=self._on_open_rules,
-                state="normal",
-            )
-            return
-        self._rules_action_button.configure(
-            text="Review rules",
-            command=self._on_open_rules,
-            state="disabled",
-        )
 
     def _sync_preview_hotkey(self, normalize_base: str) -> None:
         self._preview_hotkey_var.set(to_preview_hotkey(normalize_base))

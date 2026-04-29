@@ -8,7 +8,7 @@ import tempfile
 import threading
 import tkinter as tk
 import webbrowser
-from dataclasses import dataclass
+from tkinter import messagebox
 from pathlib import Path
 
 from clipboard_utils import (
@@ -36,18 +36,10 @@ from config import (
     get_settings_path,
 )
 from hotkeys import HotkeyService
-from normalizer import (
-    NormalizationRules,
-    infer_legacy_rules_version,
-    load_rules,
-    load_rules_payload,
-    normalize_text,
-    stamp_live_rules_payload,
-    write_rules_payload,
-)
+from normalizer import NormalizationRules, load_rules, load_rules_payload, normalize_text, write_rules_payload
 from tray import TrayApp
 from settings_store import AppSettings, load_settings, normalize_base_hotkey, save_settings, to_preview_hotkey
-from settings_ui import RulesVersionStatus, SettingsDialog
+from settings_ui import SettingsDialog
 from updater import UpdateCheckError, fetch_latest_release
 from version import APP_VERSION
 
@@ -55,26 +47,6 @@ try:
     import winsound  # type: ignore
 except Exception:  # pragma: no cover - Windows-only import
     winsound = None
-
-
-@dataclass(frozen=True)
-class RulesRuntimeStatus:
-    headline: str
-    detail: str = ""
-    can_update: bool = False
-    is_customized: bool = False
-
-
-def _parse_version_parts(value: str) -> tuple[int, ...]:
-    parts: list[int] = []
-    for part in value.split("."):
-        if part.isdigit():
-            parts.append(int(part))
-        else:
-            digits = "".join(ch for ch in part if ch.isdigit())
-            if digits:
-                parts.append(int(digits))
-    return tuple(parts) if parts else (0,)
 
 
 class AppController:
@@ -113,8 +85,12 @@ class AppController:
     def preview_now(self) -> None:
         self.request_normalize(preview=True, source="hotkey")
 
-    def check_for_updates(self) -> None:
-        thread = threading.Thread(target=self._check_for_updates_worker, daemon=True)
+    def check_for_updates(self, *, silent_if_current: bool = False, silent_on_error: bool = False) -> None:
+        thread = threading.Thread(
+            target=self._check_for_updates_worker,
+            kwargs={"silent_if_current": silent_if_current, "silent_on_error": silent_on_error},
+            daemon=True,
+        )
         thread.start()
 
     def open_settings(self) -> None:
@@ -134,32 +110,19 @@ class AppController:
 
         def _open() -> None:
             try:
-                rules_status = self._get_rules_runtime_status()
                 self._settings_dialog_open = True
                 self._active_settings_dialog = SettingsDialog(
                     self._root,
                     self._settings,
                     APP_VERSION,
                     _on_save,
-                    self.check_for_updates,
+                    lambda: self.check_for_updates(silent_if_current=False, silent_on_error=False),
                     self.open_rules,
                     self.open_default_rules,
-                    self.open_rules_guide,
-                    self.open_readme,
                     self.reset_rules_to_default,
-                    self.open_update_download,
                     _on_close,
                 )
-                self._active_settings_dialog.set_rules_status(
-                    RulesVersionStatus(
-                        headline=rules_status.headline,
-                        detail=rules_status.detail,
-                        can_update=rules_status.can_update,
-                        is_customized=rules_status.is_customized,
-                    )
-                )
-                self._active_settings_dialog.set_update_checking()
-                self.check_for_updates()
+                self.check_for_updates(silent_if_current=True, silent_on_error=True)
             except Exception:
                 self._settings_dialog_open = False
                 self._active_settings_dialog = None
@@ -168,37 +131,39 @@ class AppController:
 
         self._tray.schedule_on_ui(_open)
 
-    def _check_for_updates_worker(self) -> None:
+    def _check_for_updates_worker(self, *, silent_if_current: bool, silent_on_error: bool) -> None:
         try:
             status = fetch_latest_release(APP_VERSION)
         except UpdateCheckError as exc:
             logging.exception("update check failed")
+            if not silent_on_error:
+                self._notify(f"Update check failed: {exc}")
+            return
 
-            def _show_error() -> None:
-                if self._active_settings_dialog is not None:
-                    self._active_settings_dialog.set_update_error(f"Update check failed: {exc}")
-
-            if self._tray is not None:
-                self._tray.schedule_on_ui(_show_error)
+        if self._tray is None:
             return
 
         def _show_result() -> None:
-            if self._active_settings_dialog is None:
-                return
             if status.update_available:
-                self._active_settings_dialog.set_update_available(status)
-            else:
-                self._active_settings_dialog.set_up_to_date(status.current_version)
+                should_open = messagebox.askyesno(
+                    f"{APP_NAME} Update",
+                    (
+                        f"Version {status.latest_version} is available.\n\n"
+                        f"You are running {status.current_version}.\n\n"
+                        "Open the download page now?"
+                    ),
+                    parent=self._root,
+                )
+                if should_open:
+                    webbrowser.open(status.download_url)
+            elif not silent_if_current:
+                messagebox.showinfo(
+                    f"{APP_NAME} Update",
+                    f"You are up to date on version {status.current_version}.",
+                    parent=self._root,
+                )
 
-        if self._tray is not None:
-            self._tray.schedule_on_ui(_show_result)
-
-    def open_update_download(self, url: str) -> None:
-        try:
-            webbrowser.open(url)
-        except Exception:
-            logging.exception("failed to open update download url")
-            self._notify("Could not open the update download page.")
+        self._tray.schedule_on_ui(_show_result)
 
     def request_normalize(self, *, preview: bool, source: str) -> None:
         if not self._busy_lock.acquire(blocking=False):
@@ -363,18 +328,8 @@ class AppController:
                 self._notify("Bundled default rules are missing.")
                 return
             bundled_payload = load_rules_payload(bundled_path)
-            write_rules_payload(runtime_path, stamp_live_rules_payload(bundled_payload))
+            write_rules_payload(runtime_path, bundled_payload)
             self._rules = load_rules(runtime_path)
-            if self._active_settings_dialog is not None:
-                rules_status = self._get_rules_runtime_status()
-                self._active_settings_dialog.set_rules_status(
-                    RulesVersionStatus(
-                        headline=rules_status.headline,
-                        detail=rules_status.detail,
-                        can_update=rules_status.can_update,
-                        is_customized=rules_status.is_customized,
-                    )
-                )
             self._notify("Live rules reset to bundled defaults.")
         except Exception:
             logging.exception("failed to reset rules file")
@@ -399,74 +354,6 @@ class AppController:
 
         self._tray.schedule_on_ui(_open)
 
-    def _get_rules_runtime_status(self) -> RulesRuntimeStatus:
-        bundled_path = get_resource_dir() / "rules.toml"
-        live_path = get_rules_path()
-        try:
-            bundled_rules = load_rules(bundled_path)
-        except Exception:
-            logging.exception("failed to load bundled default rules")
-            return RulesRuntimeStatus("Bundled defaults could not be read.")
-        try:
-            live_rules = load_rules(live_path)
-        except Exception:
-            logging.exception("failed to load live rules")
-            return RulesRuntimeStatus("Live rules could not be read.")
-
-        bundled_version = bundled_rules.rules_version or "unknown"
-        live_version = (
-            live_rules.based_on_rules_version
-            or live_rules.rules_version
-            or infer_legacy_rules_version(live_rules)
-            or "unknown"
-        )
-
-        if live_rules.current_rules_digest == bundled_rules.current_rules_digest:
-            detail = f"Live rules match bundled defaults v{bundled_version}."
-            if live_rules.base_rules_digest and live_rules.is_customized():
-                detail = f"Live rules are customized and already based on v{bundled_version}."
-            return RulesRuntimeStatus(
-                headline=f"Up to date (v{bundled_version})",
-                detail=detail,
-                is_customized=bool(live_rules.base_rules_digest and live_rules.is_customized()),
-            )
-
-        live_is_customized = live_rules.is_customized()
-        if not live_rules.base_rules_digest and infer_legacy_rules_version(live_rules):
-            live_is_customized = False
-
-        if _parse_version_parts(live_version) < _parse_version_parts(bundled_version):
-            if live_is_customized:
-                return RulesRuntimeStatus(
-                    headline=f"New defaults available (v{bundled_version})",
-                    detail=(
-                        f"Your live rules are customized and still based on v{live_version}. "
-                        "Review the new defaults if you want to copy any changes."
-                    ),
-                    is_customized=True,
-                )
-            return RulesRuntimeStatus(
-                headline=f"Update available ({live_version} -> {bundled_version})",
-                detail="Your live rules still match an older default set.",
-                can_update=True,
-            )
-
-        if live_is_customized:
-            return RulesRuntimeStatus(
-                headline=f"Customized (based on v{live_version})",
-                detail="Your live rules differ from the bundled defaults and were kept unchanged.",
-                is_customized=True,
-            )
-
-        return RulesRuntimeStatus(
-            headline=f"Review recommended (bundled v{bundled_version})",
-            detail=(
-                "This live rules file predates rules version tracking or differs from the bundled defaults. "
-                "Review it before resetting to new defaults."
-            ),
-            is_customized=True,
-        )
-
     def open_rules(self) -> None:
         try:
             rules_path = ensure_rules_file()
@@ -476,12 +363,6 @@ class AppController:
             self._notify("Could not open rules.toml.")
             return
         self._open_local_file(rules_path, error_message="Could not open rules.toml.")
-
-    def open_readme(self) -> None:
-        self._open_local_file(get_resource_dir() / "README.md", error_message="Could not open README.md.")
-
-    def open_rules_guide(self) -> None:
-        self._open_local_file(get_resource_dir() / "RULES.md", error_message="Could not open RULES.md.")
 
     def shutdown(self) -> None:
         self._shutdown_event.set()

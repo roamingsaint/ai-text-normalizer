@@ -75,7 +75,7 @@ In Settings:
 - `Reset live rules to defaults`
 - `Check for updates (vX.Y.Z)`
 
-Rules format and ordering are documented in [RULES.md](/C:/DEV/TextNormalizer/RULES.md).
+The `rules.toml` file includes inline comments that explain the format.
 
 ## Update check behavior
 

@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-04-30
+
+### Changed
+- Simplified Settings UI back to the basic rules and app-update flow.
+- Replaced JSON rules files with `rules.toml` and moved rule guidance into inline TOML comments.
+- Opening Settings now performs a quiet background app update check.
+
 ## [1.0.1] - 2026-04-30
 
 ### Added

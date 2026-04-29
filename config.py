@@ -80,40 +80,17 @@ def ensure_runtime_paths() -> None:
 
 
 def ensure_rules_file() -> Path:
-    from normalizer import (
-        infer_legacy_rules_version,
-        load_rules,
-        load_rules_payload,
-        stamp_live_rules_payload,
-        write_rules_payload,
-    )
+    from normalizer import load_rules_payload, write_rules_payload
 
     runtime_rules = get_rules_path()
     legacy_runtime_rules = get_legacy_rules_path()
     bundled_rules = get_resource_dir() / "rules.toml"
     if runtime_rules.exists():
-        if bundled_rules.exists():
-            try:
-                runtime_payload = load_rules_payload(runtime_rules)
-                bundled_payload = load_rules_payload(bundled_rules)
-                if (
-                    not runtime_payload.get("base_rules_digest")
-                    and runtime_payload.get("rules_version") == bundled_payload.get("rules_version")
-                ):
-                    write_rules_payload(runtime_rules, stamp_live_rules_payload(runtime_payload))
-            except Exception:
-                pass
         return runtime_rules
 
     if legacy_runtime_rules.exists():
         try:
             legacy_payload = load_rules_payload(legacy_runtime_rules)
-            if not legacy_payload.get("base_rules_digest"):
-                legacy_rules = load_rules(legacy_runtime_rules)
-                legacy_payload = stamp_live_rules_payload(
-                    legacy_payload,
-                    based_on_rules_version=infer_legacy_rules_version(legacy_rules) or None,
-                )
             write_rules_payload(runtime_rules, legacy_payload)
             return runtime_rules
         except Exception:
@@ -121,7 +98,7 @@ def ensure_rules_file() -> Path:
 
     if bundled_rules.exists():
         runtime_payload = load_rules_payload(bundled_rules)
-        write_rules_payload(runtime_rules, stamp_live_rules_payload(runtime_payload))
+        write_rules_payload(runtime_rules, runtime_payload)
     return runtime_rules
 
 
