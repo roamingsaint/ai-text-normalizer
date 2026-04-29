@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-04-30
+
+### Changed
+- Update availability now appears inside the Settings `Updates` section instead of a separate popup.
+
 ## [1.0.2] - 2026-04-30
 
 ### Changed

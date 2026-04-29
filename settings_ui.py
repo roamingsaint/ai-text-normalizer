@@ -6,6 +6,7 @@ from typing import Callable
 
 from config import APP_NAME
 from settings_store import AppSettings, normalize_base_hotkey, to_preview_hotkey
+from updater import UpdateStatus
 
 SHIFT_MASK = 0x0001
 CONTROL_MASK = 0x0004
@@ -121,6 +122,7 @@ class SettingsDialog:
         current_version: str,
         on_save: Callable[[AppSettings], bool],
         on_check_updates: Callable[[], None],
+        on_open_update_download: Callable[[str], None],
         on_open_rules: Callable[[], None],
         on_open_default_rules: Callable[[], None],
         on_reset_rules: Callable[[], None],
@@ -129,10 +131,12 @@ class SettingsDialog:
         self._root = root
         self._on_save = on_save
         self._on_check_updates = on_check_updates
+        self._on_open_update_download = on_open_update_download
         self._on_open_rules = on_open_rules
         self._on_open_default_rules = on_open_default_rules
         self._on_reset_rules = on_reset_rules
         self._on_close = on_close
+        self._update_download_url: str | None = None
 
         normalize_base = normalize_base_hotkey(settings.normalize_hotkey)
 
@@ -208,7 +212,27 @@ class SettingsDialog:
 
         updates_frame = ttk.Labelframe(container, text="Updates", padding=10)
         updates_frame.pack(fill="x", pady=(14, 0))
-        ttk.Button(updates_frame, text=f"Check for updates (v{current_version})", command=self._on_check_updates).pack(anchor="w")
+        self._check_updates_button = ttk.Button(
+            updates_frame,
+            text=f"Check for updates (v{current_version})",
+            command=self._start_update_check,
+        )
+        self._check_updates_button.pack(anchor="w")
+        self._update_status_var = tk.StringVar(value="")
+        self._update_status_label = ttk.Label(
+            updates_frame,
+            textvariable=self._update_status_var,
+            justify="left",
+            wraplength=420,
+        )
+        self._update_status_label.pack(anchor="w", pady=(8, 0))
+        self._open_download_button = ttk.Button(
+            updates_frame,
+            text="Open download page",
+            command=self._open_download_page,
+            state="disabled",
+        )
+        self._open_download_button.pack(anchor="w", pady=(8, 0))
 
         buttons = ttk.Frame(container)
         buttons.pack(fill="x", pady=(14, 0))
@@ -218,6 +242,40 @@ class SettingsDialog:
         self._center_on_screen()
         self.focus()
         self._window.grab_set()
+
+    def _start_update_check(self) -> None:
+        self.set_update_checking()
+        self._on_check_updates()
+
+    def _open_download_page(self) -> None:
+        if self._update_download_url:
+            self._on_open_update_download(self._update_download_url)
+
+    def set_update_checking(self) -> None:
+        self._update_download_url = None
+        self._check_updates_button.configure(state="disabled")
+        self._open_download_button.configure(state="disabled")
+        self._update_status_var.set("Checking for updates...")
+
+    def set_update_available(self, status: UpdateStatus) -> None:
+        self._update_download_url = status.download_url
+        self._check_updates_button.configure(state="normal")
+        self._open_download_button.configure(state="normal")
+        self._update_status_var.set(
+            f"Version {status.latest_version} is available. You are running {status.current_version}."
+        )
+
+    def set_up_to_date(self, current_version: str) -> None:
+        self._update_download_url = None
+        self._check_updates_button.configure(state="normal")
+        self._open_download_button.configure(state="disabled")
+        self._update_status_var.set(f"You are up to date on version {current_version}.")
+
+    def set_update_error(self, message: str) -> None:
+        self._update_download_url = None
+        self._check_updates_button.configure(state="normal")
+        self._open_download_button.configure(state="disabled")
+        self._update_status_var.set(message)
 
     def _sync_preview_hotkey(self, normalize_base: str) -> None:
         self._preview_hotkey_var.set(to_preview_hotkey(normalize_base))

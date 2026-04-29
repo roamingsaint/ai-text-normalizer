@@ -8,7 +8,6 @@ import tempfile
 import threading
 import tkinter as tk
 import webbrowser
-from tkinter import messagebox
 from pathlib import Path
 
 from clipboard_utils import (
@@ -117,11 +116,13 @@ class AppController:
                     APP_VERSION,
                     _on_save,
                     lambda: self.check_for_updates(silent_if_current=False, silent_on_error=False),
+                    self.open_update_download,
                     self.open_rules,
                     self.open_default_rules,
                     self.reset_rules_to_default,
                     _on_close,
                 )
+                self._active_settings_dialog.set_update_checking()
                 self.check_for_updates(silent_if_current=True, silent_on_error=True)
             except Exception:
                 self._settings_dialog_open = False
@@ -136,34 +137,32 @@ class AppController:
             status = fetch_latest_release(APP_VERSION)
         except UpdateCheckError as exc:
             logging.exception("update check failed")
-            if not silent_on_error:
-                self._notify(f"Update check failed: {exc}")
+            if not silent_on_error and self._active_settings_dialog is not None and self._tray is not None:
+                self._tray.schedule_on_ui(
+                    lambda: self._active_settings_dialog is not None
+                    and self._active_settings_dialog.set_update_error(f"Update check failed: {exc}")
+                )
             return
 
-        if self._tray is None:
+        if self._tray is None or self._active_settings_dialog is None:
             return
 
         def _show_result() -> None:
+            if self._active_settings_dialog is None:
+                return
             if status.update_available:
-                should_open = messagebox.askyesno(
-                    f"{APP_NAME} Update",
-                    (
-                        f"Version {status.latest_version} is available.\n\n"
-                        f"You are running {status.current_version}.\n\n"
-                        "Open the download page now?"
-                    ),
-                    parent=self._root,
-                )
-                if should_open:
-                    webbrowser.open(status.download_url)
+                self._active_settings_dialog.set_update_available(status)
             elif not silent_if_current:
-                messagebox.showinfo(
-                    f"{APP_NAME} Update",
-                    f"You are up to date on version {status.current_version}.",
-                    parent=self._root,
-                )
+                self._active_settings_dialog.set_up_to_date(status.current_version)
 
         self._tray.schedule_on_ui(_show_result)
+
+    def open_update_download(self, url: str) -> None:
+        try:
+            webbrowser.open(url)
+        except Exception:
+            logging.exception("failed to open update download url")
+            self._notify("Could not open the update download page.")
 
     def request_normalize(self, *, preview: bool, source: str) -> None:
         if not self._busy_lock.acquire(blocking=False):
