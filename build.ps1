@@ -56,5 +56,5 @@ python -m PyInstaller `
   --distpath release `
   --icon "assets\ai-text-normalizer.ico" `
   --version-file "$versionMetaPath" `
-  --add-data "rules.json;." `
+  --add-data "rules.toml;." `
   main.py

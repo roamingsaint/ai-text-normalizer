@@ -1,0 +1,41 @@
+# AI Text Normalizer rules
+# Comments are allowed here. See RULES.md for more details and examples.
+
+version = 1
+rules_version = "1.1.0"
+
+[[literal_replacements]]
+find = "\u2019"
+replace = "'"
+
+[[literal_replacements]]
+find = "\u2018"
+replace = "'"
+
+[[literal_replacements]]
+find = "\u201c"
+replace = "\""
+
+[[literal_replacements]]
+find = "\u201d"
+replace = "\""
+
+[[literal_replacements]]
+find = "\u2026"
+replace = "..."
+
+[[literal_replacements]]
+find = "\u00a0"
+replace = " "
+
+[[literal_replacements]]
+find = "\u202f"
+replace = " "
+
+[[regex_replacements]]
+pattern = "(?<=\\S)[\u2013\u2014](?=\\S)"
+replace = " - "
+
+[[regex_replacements]]
+pattern = "[ \\t]*[\u2013\u2014][ \\t]*"
+replace = " - "

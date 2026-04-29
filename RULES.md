@@ -1,6 +1,6 @@
 ﻿# Rules
 
-`rules.json` supports two kinds of replacements:
+`rules.toml` supports two kinds of replacements:
 
 - `literal_replacements`
 - `regex_replacements`
@@ -10,7 +10,7 @@ It also carries lightweight metadata:
 - `rules_version`: version of the bundled default rules shipped in this release
 - live user copies may also include `based_on_rules_version` and `base_rules_digest`
 
-`rules.json` stays machine-readable JSON. Human guidance and examples live in `RULES.md`, and both files should be versioned together in the same repo tag/release.
+`rules.toml` stays machine-readable and allows comments. Human guidance and examples live in `RULES.md`, and both files should be versioned together in the same repo tag/release.
 
 Processing order is:
 
@@ -45,9 +45,14 @@ Examples:
 
 Example:
 
-```json
-{ "pattern": "(?<=\\S)[\\u2013\\u2014](?=\\S)", "replace": " - " }
-{ "pattern": "[ \\t]*[\\u2013\\u2014][ \\t]*", "replace": " - " }
+```toml
+[[regex_replacements]]
+pattern = "(?<=\\S)[\\u2013\\u2014](?=\\S)"
+replace = " - "
+
+[[regex_replacements]]
+pattern = "[ \\t]*[\\u2013\\u2014][ \\t]*"
+replace = " - "
 ```
 
 Those rules mean:
@@ -73,9 +78,14 @@ The second rule means:
 
 These two literal rules are weaker:
 
-```json
-{ "find": " — ", "replace": " - " }
-{ "find": "—", "replace": " - " }
+```toml
+[[literal_replacements]]
+find = " — "
+replace = " - "
+
+[[literal_replacements]]
+find = "—"
+replace = " - "
 ```
 
 They only cover exact cases and can overlap in awkward ways.

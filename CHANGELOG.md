@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-30
+
+### Added
+- TOML-based rules files with comment support in bundled and live defaults.
+
+### Changed
+- Live rules now use `rules.toml` instead of `rules.json`.
+- Existing `rules.json` files are migrated forward to `rules.toml` on first run.
+
 ## [1.0.0] - 2026-04-30
 
 ### Added

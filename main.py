@@ -335,14 +335,14 @@ class AppController:
         return result["replace"]
 
     def open_default_rules(self) -> None:
-        bundled_path = get_resource_dir() / "rules.json"
+        bundled_path = get_resource_dir() / "rules.toml"
         if not bundled_path.exists():
             self._notify("Bundled default rules are missing.")
             return
 
         def _open() -> None:
             try:
-                view_path = Path(tempfile.gettempdir()) / "ai-text-normalizer-default-rules.json"
+                view_path = Path(tempfile.gettempdir()) / "ai-text-normalizer-default-rules.toml"
                 shutil.copyfile(bundled_path, view_path)
                 try:
                     os.startfile(str(view_path))
@@ -357,7 +357,7 @@ class AppController:
 
     def reset_rules_to_default(self) -> None:
         try:
-            bundled_path = get_resource_dir() / "rules.json"
+            bundled_path = get_resource_dir() / "rules.toml"
             runtime_path = ensure_rules_file()
             if not bundled_path.exists():
                 self._notify("Bundled default rules are missing.")
@@ -400,7 +400,7 @@ class AppController:
         self._tray.schedule_on_ui(_open)
 
     def _get_rules_runtime_status(self) -> RulesRuntimeStatus:
-        bundled_path = get_resource_dir() / "rules.json"
+        bundled_path = get_resource_dir() / "rules.toml"
         live_path = get_rules_path()
         try:
             bundled_rules = load_rules(bundled_path)
@@ -473,9 +473,9 @@ class AppController:
             rules_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception:
             logging.exception("failed to prepare rules file")
-            self._notify("Could not open rules.json.")
+            self._notify("Could not open rules.toml.")
             return
-        self._open_local_file(rules_path, error_message="Could not open rules.json.")
+        self._open_local_file(rules_path, error_message="Could not open rules.toml.")
 
     def open_readme(self) -> None:
         self._open_local_file(get_resource_dir() / "README.md", error_message="Could not open README.md.")

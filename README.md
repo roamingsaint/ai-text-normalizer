@@ -25,7 +25,7 @@ This can still evolve in the same repo later by keeping the normalization engine
 - Ellipsis (`…`) to `...`
 - Non-breaking spaces to regular spaces
 
-You can extend or change these rules in Settings via `Open live rules.json`.
+You can extend or change these rules in Settings via `Open live rules.toml`.
 
 ## Install (Windows users)
 
@@ -70,7 +70,7 @@ In Settings:
 ## Rules and updates
 
 In Settings:
-- `Open live rules.json`
+- `Open live rules.toml`
 - `View bundled defaults`
 - `Reset live rules to defaults`
 - `Check for updates (vX.Y.Z)`
@@ -104,8 +104,8 @@ Distribute from GitHub Releases:
 3. Tag and push, for example:
 
 ```powershell
-git tag v0.3.1
-git push origin v0.3.1
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 GitHub Actions will build and publish EXE, checksum, and portable ZIP assets.

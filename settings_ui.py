@@ -219,7 +219,7 @@ class SettingsDialog:
 
         rules_frame = ttk.Labelframe(container, text="Rules", padding=10)
         rules_frame.pack(fill="x", pady=(14, 0))
-        ttk.Button(rules_frame, text="Open live rules.json", command=self._on_open_rules).pack(side="left")
+        ttk.Button(rules_frame, text="Open live rules.toml", command=self._on_open_rules).pack(side="left")
         ttk.Button(rules_frame, text="View bundled defaults", command=self._on_open_default_rules).pack(side="left", padx=(8, 0))
         ttk.Button(rules_frame, text="Reset live rules to defaults", command=self._confirm_reset_rules).pack(side="left", padx=(8, 0))
 
@@ -253,7 +253,7 @@ class SettingsDialog:
         )
         self._open_download_button.pack(anchor="w", pady=(8, 0))
         ttk.Separator(updates_frame, orient="horizontal").pack(fill="x", pady=(12, 10))
-        ttk.Label(updates_frame, text="Default rules.json").pack(anchor="w")
+        ttk.Label(updates_frame, text="Default rules.toml").pack(anchor="w")
         self._rules_status_var = tk.StringVar(value="")
         self._rules_status_label = ttk.Label(
             updates_frame,
@@ -390,7 +390,7 @@ class SettingsDialog:
     def _confirm_reset_rules(self) -> None:
         should_reset = messagebox.askyesno(
             f"{APP_NAME} Settings",
-            "Replace your live rules.json with the bundled defaults?",
+            "Replace your live rules.toml with the bundled defaults?",
             parent=self._window,
         )
         if should_reset:
