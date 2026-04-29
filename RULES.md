@@ -5,6 +5,13 @@
 - `literal_replacements`
 - `regex_replacements`
 
+It also carries lightweight metadata:
+
+- `rules_version`: version of the bundled default rules shipped in this release
+- live user copies may also include `based_on_rules_version` and `base_rules_digest`
+
+`rules.json` stays machine-readable JSON. Human guidance and examples live in `RULES.md`, and both files should be versioned together in the same repo tag/release.
+
 Processing order is:
 
 1. literal replacements
@@ -39,10 +46,23 @@ Examples:
 Example:
 
 ```json
+{ "pattern": "(?<=\\S)[\\u2013\\u2014](?=\\S)", "replace": " - " }
 { "pattern": "[ \\t]*[\\u2013\\u2014][ \\t]*", "replace": " - " }
 ```
 
-That rule means:
+Those rules mean:
+
+- if an en dash or em dash appears directly between non-whitespace characters, replace it with ` - `
+- otherwise, normalize any en dash or em dash plus surrounding spaces/tabs to ` - `
+
+Examples:
+
+- `role—owning` -> `role - owning`
+- `role – owning` -> `role - owning`
+- `hello—world` -> `hello - world`
+- `hello — world` -> `hello - world`
+
+The second rule means:
 
 - match zero or more spaces or tabs
 - then an en dash or em dash

@@ -73,14 +73,27 @@ def ensure_runtime_paths() -> None:
 
 
 def ensure_rules_file() -> Path:
+    from normalizer import load_rules_payload, stamp_live_rules_payload, write_rules_payload
+
     runtime_rules = get_rules_path()
+    bundled_rules = get_resource_dir() / "rules.json"
     if runtime_rules.exists():
+        if bundled_rules.exists():
+            try:
+                runtime_payload = load_rules_payload(runtime_rules)
+                bundled_payload = load_rules_payload(bundled_rules)
+                if (
+                    not runtime_payload.get("base_rules_digest")
+                    and runtime_payload.get("rules_version") == bundled_payload.get("rules_version")
+                ):
+                    write_rules_payload(runtime_rules, stamp_live_rules_payload(runtime_payload))
+            except Exception:
+                pass
         return runtime_rules
 
-    bundled_rules = get_resource_dir() / "rules.json"
     if bundled_rules.exists():
-        runtime_rules.parent.mkdir(parents=True, exist_ok=True)
-        runtime_rules.write_text(bundled_rules.read_text(encoding="utf-8"), encoding="utf-8")
+        runtime_payload = load_rules_payload(bundled_rules)
+        write_rules_payload(runtime_rules, stamp_live_rules_payload(runtime_payload))
     return runtime_rules
 
 
