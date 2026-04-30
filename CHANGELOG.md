@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-04-30
+
+### Changed
+- Removed the automatic Settings-open update check; update checks are manual from the Settings `Updates` section.
+
 ## [1.0.3] - 2026-04-30
 
 ### Changed

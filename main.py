@@ -122,8 +122,6 @@ class AppController:
                     self.reset_rules_to_default,
                     _on_close,
                 )
-                self._active_settings_dialog.set_update_checking()
-                self.check_for_updates(silent_if_current=True, silent_on_error=True)
             except Exception:
                 self._settings_dialog_open = False
                 self._active_settings_dialog = None
