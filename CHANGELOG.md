@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-05-03
+
+### Changed
+- Removed automatic update checks when opening Settings.
+- Kept update results inside the Settings `Updates` section for manual checks.
+
 ## [1.0.4] - 2026-04-30
 
 ### Changed
